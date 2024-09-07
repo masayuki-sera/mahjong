@@ -85,7 +85,7 @@
     </div>
 
     <button onclick="calculateAndAddScores()">計算して追加</button>
-    <button onclick="deleteLastRow()">最新の1行を削除</button>
+    <button onclick="confirmDelete()">最新の1行を削除</button>
 
     <div class="error-message" id="errorMessage"></div>
 
@@ -120,12 +120,16 @@
 
         // ページが読み込まれたときにプレイヤー名を入力させる
         window.onload = function() {
-            let playerNames = [];
-            for (let i = 1; i <= 4; i++) {
-                let playerName = prompt('プレイヤー' + i + 'の名前を入力してください:');
-                playerNames.push(playerName || 'プレイヤー' + i);
+            let playerNames = JSON.parse(localStorage.getItem('playerNames')) || [];
+            if (playerNames.length === 0) {
+                for (let i = 1; i <= 4; i++) {
+                    let playerName = prompt('プレイヤー' + i + 'の名前を入力してください:');
+                    playerNames.push(playerName || 'プレイヤー' + i);
+                }
+                localStorage.setItem('playerNames', JSON.stringify(playerNames));
             }
             setPlayerNames(playerNames);
+            loadPreviousScores();
         };
 
         function setPlayerNames(names) {
@@ -147,47 +151,41 @@
 
             if (totalScore !== 100000) {
                 document.getElementById('errorMessage').textContent = 'エラー: 合計点数が100,000点ではありません。';
-                return;  // エラーがある場合は、計算結果を追加しない
+                return;
             } else {
-                document.getElementById('errorMessage').textContent = '';  // エラーメッセージをクリア
+                document.getElementById('errorMessage').textContent = ''; 
             }
 
-            // スコアを配列に格納し、ソートして順位を決定
             let scores = [
                 { score: player1, index: 1 },
                 { score: player2, index: 2 },
                 { score: player3, index: 3 },
                 { score: player4, index: 4 }
             ];
-            scores.sort((a, b) => b.score - a.score); // 降順にソート
+            scores.sort((a, b) => b.score - a.score); 
 
-            // 順位に応じた点数調整
-            scores[0].score += 30000; // 1位
-            scores[1].score += 10000; // 2位
-            scores[2].score -= 10000; // 3位
-            scores[3].score -= 30000; // 4位
+            scores[0].score += 30000; 
+            scores[1].score += 10000; 
+            scores[2].score -= 10000; 
+            scores[3].score -= 30000; 
 
-            // 100で割って差を計算
             scores.forEach(score => {
                 score.score = Math.floor((score.score - baseScore) / 20);
             });
 
-            // 結果を表示
             const resultRow = document.createElement('tr');
-            scores.sort((a, b) => a.index - b.index); // 元の順番に戻す
+            scores.sort((a, b) => a.index - b.index);
 
             scores.forEach((score, idx) => {
                 const resultCell = document.createElement('td');
                 resultCell.textContent = score.score;
                 resultRow.appendChild(resultCell);
 
-                // 各プレイヤーの合計点数を更新
                 totalScores[idx] += score.score;
             });
 
             document.getElementById('resultTable').querySelector('tbody').appendChild(resultRow);
-
-            // 合計点数を表示
+            saveScores();
             updateTotalScores();
         }
 
@@ -198,17 +196,52 @@
             document.getElementById('totalScore4').textContent = totalScores[3];
         }
 
+        function saveScores() {
+            const resultTable = document.getElementById('resultTable').querySelector('tbody');
+            const rows = Array.from(resultTable.rows);
+            const scores = rows.map(row => Array.from(row.cells).map(cell => cell.textContent));
+            localStorage.setItem('resultScores', JSON.stringify(scores));
+            localStorage.setItem('totalScores', JSON.stringify(totalScores));
+        }
+
+        function loadPreviousScores() {
+            const savedScores = JSON.parse(localStorage.getItem('resultScores')) || [];
+            const savedTotalScores = JSON.parse(localStorage.getItem('totalScores')) || [0, 0, 0, 0];
+
+            totalScores = savedTotalScores;
+
+            savedScores.forEach(scoreRow => {
+                const resultRow = document.createElement('tr');
+                scoreRow.forEach(score => {
+                    const resultCell = document.createElement('td');
+                    resultCell.textContent = score;
+                    resultRow.appendChild(resultCell);
+                });
+                document.getElementById('resultTable').querySelector('tbody').appendChild(resultRow);
+            });
+
+            updateTotalScores();
+        }
+
+        function confirmDelete() {
+            const confirmDelete = confirm("最新の1行を削除しますか？");
+            if (confirmDelete) {
+                deleteLastRow();
+            }
+        }
+
         function deleteLastRow() {
             const table = document.getElementById('resultTable');
             const rowCount = table.rows.length;
 
-            if (rowCount > 1) {  // ヘッダー行を除いた行があるか確認
+            if (rowCount > 1) {  
                 const lastRow = table.rows[rowCount - 1];
                 for (let i = 0; i < 4; i++) {
                     totalScores[i] -= parseInt(lastRow.cells[i].textContent);
                 }
-                table.deleteRow(rowCount - 1);  // 最後の行を削除
-                updateTotalScores();  // 合計点数を更新
+                table.deleteRow(rowCount - 1);  
+                updateTotalScores();  
+                saveScores();  
             }
         }
     </script>
