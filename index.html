@@ -38,6 +38,12 @@
         button:hover {
             background-color: #45a049;
         }
+        .delete-btn {
+            background-color: red;
+        }
+        .delete-btn:hover {
+            background-color: darkred;
+        }
         .error-message {
             color: red;
             margin-top: 10px;
@@ -86,6 +92,7 @@
 
     <button onclick="calculateAndAddScores()">計算して追加</button>
     <button onclick="confirmDelete()">最新の1行を削除</button>
+    <button class="delete-btn" onclick="resetAllData()">データを削除</button>
 
     <div class="error-message" id="errorMessage"></div>
 
@@ -115,10 +122,10 @@
         </tbody>
     </table>
 
+    
     <script>
         let totalScores = [0, 0, 0, 0];
-
-        // ページが読み込まれたときにプレイヤー名を入力させる
+    
         window.onload = function() {
             let playerNames = JSON.parse(localStorage.getItem('playerNames')) || [];
             if (playerNames.length === 0) {
@@ -131,7 +138,7 @@
             setPlayerNames(playerNames);
             loadPreviousScores();
         };
-
+    
         function setPlayerNames(names) {
             const headerRow = document.getElementById('playerNames');
             for (let i = 0; i < names.length; i++) {
@@ -139,63 +146,83 @@
                 document.getElementById('playerLabel' + (i + 1)).textContent = names[i];
             }
         }
-
+    
+        function askUserToResolveTie(players) {
+            let message = '同点のプレイヤーがいます。どちらが上位ですか？\n';
+            for (let i = 0; i < players.length; i++) {
+                message += `${i + 1}: ${players[i].name}\n`;
+            }
+            const choice = parseInt(prompt(message)) - 1;
+            return players[choice];
+        }
+    
         function calculateAndAddScores() {
             const baseScore = 25000;
             const player1 = parseInt(document.getElementById('player1').value) || 0;
             const player2 = parseInt(document.getElementById('player2').value) || 0;
             const player3 = parseInt(document.getElementById('player3').value) || 0;
             const player4 = parseInt(document.getElementById('player4').value) || 0;
-
+    
             const totalScore = player1 + player2 + player3 + player4;
-
+    
             if (totalScore !== 100000) {
                 document.getElementById('errorMessage').textContent = 'エラー: 合計点数が100,000点ではありません。';
                 return;
             } else {
                 document.getElementById('errorMessage').textContent = ''; 
             }
-
+    
             let scores = [
-                { score: player1, index: 1 },
-                { score: player2, index: 2 },
-                { score: player3, index: 3 },
-                { score: player4, index: 4 }
+                { score: player1, index: 1, name: document.getElementById('playerLabel1').textContent },
+                { score: player2, index: 2, name: document.getElementById('playerLabel2').textContent },
+                { score: player3, index: 3, name: document.getElementById('playerLabel3').textContent },
+                { score: player4, index: 4, name: document.getElementById('playerLabel4').textContent }
             ];
-            scores.sort((a, b) => b.score - a.score); 
-
-            scores[0].score += 30000; 
-            scores[1].score += 10000; 
-            scores[2].score -= 10000; 
-            scores[3].score -= 30000; 
-
+    
+            // 同点のプレイヤーを確認して順位を決める
+            scores.sort((a, b) => b.score - a.score);
+            for (let i = 0; i < scores.length - 1; i++) {
+                if (scores[i].score === scores[i + 1].score) {
+                    const tiePlayers = [scores[i], scores[i + 1]];
+                    const chosenPlayer = askUserToResolveTie(tiePlayers);
+                    if (chosenPlayer.index === scores[i + 1].index) {
+                        [scores[i], scores[i + 1]] = [scores[i + 1], scores[i]]; // 順位を入れ替え
+                    }
+                }
+            }
+    
+            scores[0].score += 30000;
+            scores[1].score += 10000;
+            scores[2].score -= 10000;
+            scores[3].score -= 30000;
+    
             scores.forEach(score => {
                 score.score = Math.floor((score.score - baseScore) / 20);
             });
-
+    
             const resultRow = document.createElement('tr');
             scores.sort((a, b) => a.index - b.index);
-
+    
             scores.forEach((score, idx) => {
                 const resultCell = document.createElement('td');
                 resultCell.textContent = score.score;
                 resultRow.appendChild(resultCell);
-
+    
                 totalScores[idx] += score.score;
             });
-
+    
             document.getElementById('resultTable').querySelector('tbody').appendChild(resultRow);
             saveScores();
             updateTotalScores();
         }
-
+    
         function updateTotalScores() {
             document.getElementById('totalScore1').textContent = totalScores[0];
             document.getElementById('totalScore2').textContent = totalScores[1];
             document.getElementById('totalScore3').textContent = totalScores[2];
             document.getElementById('totalScore4').textContent = totalScores[3];
         }
-
+    
         function saveScores() {
             const resultTable = document.getElementById('resultTable').querySelector('tbody');
             const rows = Array.from(resultTable.rows);
@@ -203,13 +230,13 @@
             localStorage.setItem('resultScores', JSON.stringify(scores));
             localStorage.setItem('totalScores', JSON.stringify(totalScores));
         }
-
+    
         function loadPreviousScores() {
             const savedScores = JSON.parse(localStorage.getItem('resultScores')) || [];
             const savedTotalScores = JSON.parse(localStorage.getItem('totalScores')) || [0, 0, 0, 0];
-
+    
             totalScores = savedTotalScores;
-
+    
             savedScores.forEach(scoreRow => {
                 const resultRow = document.createElement('tr');
                 scoreRow.forEach(score => {
@@ -219,21 +246,21 @@
                 });
                 document.getElementById('resultTable').querySelector('tbody').appendChild(resultRow);
             });
-
+    
             updateTotalScores();
         }
-
+    
         function confirmDelete() {
             const confirmDelete = confirm("最新の1行を削除しますか？");
             if (confirmDelete) {
                 deleteLastRow();
             }
         }
-
+    
         function deleteLastRow() {
             const table = document.getElementById('resultTable');
             const rowCount = table.rows.length;
-
+    
             if (rowCount > 1) {  
                 const lastRow = table.rows[rowCount - 1];
                 for (let i = 0; i < 4; i++) {
@@ -244,7 +271,22 @@
                 saveScores();  
             }
         }
+    
+        function resetAllData() {
+            if (confirm("すべてのデータを削除して最初から始めますか？")) {
+                totalScores = [0, 0, 0, 0];
+                document.getElementById('resultTable').querySelector('tbody').innerHTML = '';
+                updateTotalScores();
+    
+                localStorage.removeItem('resultScores');
+                localStorage.removeItem('totalScores');
+                localStorage.removeItem('playerNames');
+    
+                location.reload();
+            }
+        }
     </script>
+    
 
 </body>
 </html>
